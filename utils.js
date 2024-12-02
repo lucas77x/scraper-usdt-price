@@ -1,3 +1,5 @@
+// utils.js
+
 function formatPrice(priceStr) {
   // Remove thousand separators and replace comma with decimal point
   let normalized = priceStr.replace(/\./g, '').replace(',', '.').replace('$', '').trim();
@@ -11,10 +13,12 @@ function formatPrice(priceStr) {
   }
 }
 
-function getYesterdayDate() {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  return yesterday.toISOString().split('T')[0]; // 'YYYY-MM-DD'
+function getYesterdayDate(timezoneOffset) {
+  const now = new Date();
+  // Adjust for timezone
+  now.setHours(now.getHours() + timezoneOffset);
+  now.setDate(now.getDate() - 1);
+  return now.toISOString().split('T')[0]; // 'YYYY-MM-DD'
 }
 
 function calculatePercentageChange(currentPrice, previousPrice) {
@@ -22,4 +26,10 @@ function calculatePercentageChange(currentPrice, previousPrice) {
   return ((currentPrice - previousPrice) / previousPrice) * 100;
 }
 
-module.exports = { formatPrice, getYesterdayDate, calculatePercentageChange };
+function getCurrentHour(timezoneOffset) {
+  const now = new Date();
+  now.setHours(now.getHours() + timezoneOffset);
+  return now.getHours();
+}
+
+module.exports = { formatPrice, getYesterdayDate, calculatePercentageChange, getCurrentHour };

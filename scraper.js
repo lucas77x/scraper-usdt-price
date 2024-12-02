@@ -8,15 +8,11 @@ const { formatPrice } = require('./utils');
 const Notifier = require('./notifier');
 const RuleEvaluator = require('./rules');
 
-// Telegram configuration from environment variables
-const BOT_TOKEN = process.env.BOT_TOKEN;
-const CHAT_ID = process.env.CHAT_ID;
-
 class Scraper {
-  constructor(notifier) {
+  constructor(notifier, ruleEvaluator) {
     this.url = 'https://usdc.ar/';
     this.notifier = notifier;
-    this.ruleEvaluator = new RuleEvaluator();
+    this.ruleEvaluator = ruleEvaluator;
   }
 
   async run() {
@@ -39,28 +35,39 @@ class Scraper {
       // Format the price
       const formattedPrice = parseFloat(formatPrice(priceText));
 
-      // Insert the new price into the database
-      db.insertPrice(formattedPrice, vendorText);
-      console.log(`Nuevo precio guardado: ${formattedPrice} en ${vendorText}.`);
-
       // Evaluate notification rules
-      const { shouldNotify, reasons } = await this.ruleEvaluator.shouldNotify(formattedPrice);
+      const { shouldNotify, reasons, messageType } = await this.ruleEvaluator.shouldNotify(formattedPrice);
 
       if (shouldNotify) {
-        let message = `Nuevo precio: ${formattedPrice} en ${vendorText}.\nRazones:\n- ${reasons.join('\n- ')}`;
+        let message;
+
+        if (messageType === 'hourly') {
+          // Message for hourly notification
+          message = `Precio de compra: $${formattedPrice} en ${vendorText}.`;
+        } else {
+          // Default message for other notifications
+          message = `Nuevo precio: ${formattedPrice} en ${vendorText}.\nRazones:\n- ${reasons.join('\n- ')}`;
+        }
 
         // Send notification via Telegram
         try {
           await this.notifier.sendMessage(message);
           console.log('Notificación enviada por Telegram.');
-
-          // Update last notification time
-          db.updateLastNotificationTime();
         } catch (error) {
           console.error('Error al enviar la notificación:', error);
         }
       } else {
         console.log('No se envió notificación; no se cumplieron las condiciones.');
+      }
+
+      // Insert the new price into the database only if it has changed
+      const lastPrice = await this.getLastPrice();
+
+      if (formattedPrice !== lastPrice) {
+        db.insertPrice(formattedPrice, vendorText);
+        console.log(`Nuevo precio guardado: ${formattedPrice} en ${vendorText}.`);
+      } else {
+        console.log('El precio no cambió. No se guardó en la base de datos.');
       }
     } catch (error) {
       console.error('Error durante el scraping:', error);
@@ -91,11 +98,21 @@ class Scraper {
 
     return { priceText, vendorText };
   }
+
+  getLastPrice() {
+    return new Promise((resolve, reject) => {
+      db.getLastPrice((err, price) => {
+        if (err) reject(err);
+        else resolve(price !== null ? parseFloat(price) : null);
+      });
+    });
+  }
 }
 
-// Instantiate Notifier
-const notifier = new Notifier(BOT_TOKEN, CHAT_ID);
+// Instantiate Notifier and RuleEvaluator
+const notifier = new Notifier(process.env.BOT_TOKEN, process.env.CHAT_ID);
+const ruleEvaluator = new RuleEvaluator();
 
-// Pass Notifier to Scraper
-const scraper = new Scraper(notifier);
+// Instantiate and run Scraper
+const scraper = new Scraper(notifier, ruleEvaluator);
 scraper.run();
