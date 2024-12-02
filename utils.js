@@ -1,5 +1,3 @@
-// utils.js
-
 function formatPrice(priceStr) {
   // Remove thousand separators and replace comma with decimal point
   let normalized = priceStr.replace(/\./g, '').replace(',', '.').replace('$', '').trim();

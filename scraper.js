@@ -1,6 +1,4 @@
-// scraper.js
-
-require('dotenv').config(); // Load environment variables from .env file
+require('dotenv').config();
 
 const { chromium } = require('playwright');
 const db = require('./db');

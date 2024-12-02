@@ -1,5 +1,3 @@
-// rules.js
-
 const db = require('./db');
 const { calculatePercentageChange, getYesterdayDate, getCurrentHour } = require('./utils');
 const dotenv = require('dotenv');
