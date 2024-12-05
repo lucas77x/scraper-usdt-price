@@ -1,57 +1,73 @@
 const db = require('./db');
-const { getYesterdayDate, getCurrentHour } = require('./utils');
+const utils = require('./utils'); 
 const dotenv = require('dotenv');
 
 dotenv.config();
 
 class RuleEvaluator {
   constructor() {
-    // Load configurations from .env
-    this.notificationTimes = process.env.PRICE_CHANGE_NOTIFICATION_TIMES.split(',').map(time => parseInt(time));
+    this.notificationTimes = process.env.PRICE_CHANGE_NOTIFICATION_TIMES
+      .split(',')
+      .map(time => parseInt(time));
     this.timezoneOffset = parseInt(process.env.TIMEZONE_OFFSET) || 0;
     this.notificationStartTime = parseInt(process.env.NOTIFICATION_START_TIME) || 0;
     this.notificationEndTime = parseInt(process.env.NOTIFICATION_END_TIME) || 23;
 
-    // Hourly notification
     this.hourlyNotificationEnabled = process.env.HOURLY_NOTIFICATION_ENABLED === 'true';
   }
 
   async shouldNotify(currentPrice) {
-    const currentHour = getCurrentHour(this.timezoneOffset);
+    const currentHour = utils.getCurrentHour(this.timezoneOffset);
 
-    // Check if current time is within the notification window
+    // Check if the current hour is within the notification time range
     if (currentHour < this.notificationStartTime || currentHour >= this.notificationEndTime) {
       return { shouldNotify: false };
     }
 
-    // Hourly Notification Rule
+    // Hourly notification
     if (this.hourlyNotificationEnabled) {
       const notificationSent = await this.isNotificationSent('hourlyNotification');
 
-      // Check if a notification has already been sent this hour
+      // Check 
       if (!notificationSent) {
         await this.logNotification('hourlyNotification');
-        return { shouldNotify: true, reasons: [], messageType: 'hourly' };
+        return { shouldNotify: true, messageType: 'hourly' };
       }
     }
 
-    // Notification 3 times a day comparing with yesterday's price
+    // Compare the current price with the price of the previous day
     const yesterdayPrice = await this.getYesterdayPrice();
     if (yesterdayPrice !== null && this.notificationTimes.includes(currentHour)) {
       if (currentPrice !== yesterdayPrice) {
         await this.logNotification('dailyComparison');
-        return { shouldNotify: true, reasons: ['priceChange'], messageType: 'dailyComparison' };
+        return { shouldNotify: true, messageType: 'dailyComparison' };
       }
     }
 
-    // If no conditions met, do not send notification
+    // Notify if the price increased since the last check
+    const lastPrice = await this.getLastPrice();
+    if (lastPrice !== null && currentPrice > lastPrice) {
+      await this.logNotification('priceIncrease');
+      return { shouldNotify: true, messageType: 'priceIncrease' };
+    }
+
+    // Avoid sending unnecessary notifications
     return { shouldNotify: false };
   }
 
   getYesterdayPrice() {
     return new Promise((resolve, reject) => {
-      const yesterday = getYesterdayDate(this.timezoneOffset);
+      const yesterday = utils.getYesterdayDate(this.timezoneOffset);
       db.getPriceForDate(yesterday, (err, price) => {
+        if (err) reject(err);
+        else resolve(price !== null ? parseFloat(price) : null);
+      });
+    });
+  }
+
+  getLastPrice() {
+    return new Promise((resolve, reject) => {
+      db.getLastPrice((err, price) => {
         if (err) reject(err);
         else resolve(price !== null ? parseFloat(price) : null);
       });

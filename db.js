@@ -7,7 +7,6 @@ class Database {
   }
 
   createTables() {
-    // Create 'prices' table if it doesn't exist
     const pricesTable = `
       CREATE TABLE IF NOT EXISTS prices (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -17,7 +16,6 @@ class Database {
       );
     `;
 
-    // Create 'notification_log' table if it doesn't exist
     const notificationLogTable = `
       CREATE TABLE IF NOT EXISTS notification_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,12 +41,12 @@ class Database {
   }
 
   getPriceForDate(date, callback) {
-    const sql = `SELECT price FROM prices WHERE DATE(timestamp) = ? ORDER BY timestamp DESC LIMIT 1`;
+    const sql = `SELECT MAX(price) as maxPrice FROM prices WHERE DATE(timestamp) = ?`;
     this.db.get(sql, [date], (err, row) => {
       if (err) {
         return callback(err);
       }
-      callback(null, row ? row.price : null);
+      callback(null, row ? row.maxPrice : null);
     });
   }
 

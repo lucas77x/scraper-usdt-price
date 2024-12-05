@@ -34,7 +34,7 @@ class Scraper {
       const formattedPrice = parseFloat(formatPrice(priceText));
 
       // Evaluate notification rules
-      const { shouldNotify, reasons, messageType } = await this.ruleEvaluator.shouldNotify(formattedPrice);
+      const { shouldNotify, messageType } = await this.ruleEvaluator.shouldNotify(formattedPrice);
 
       if (shouldNotify) {
         let message;
@@ -44,7 +44,7 @@ class Scraper {
           message = `Precio de compra: $${formattedPrice} en ${vendorText}.`;
         } else {
           // Default message for other notifications
-          message = `Nuevo precio: ${formattedPrice} en ${vendorText}.\nRazones:\n- ${reasons.join('\n- ')}`;
+          message = `Nuevo precio: ${formattedPrice} en ${vendorText}.`;
         }
 
         // Send notification via Telegram
