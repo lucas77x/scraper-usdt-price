@@ -1,16 +1,3 @@
-function formatPrice(priceStr) {
-  // Remove thousand separators and replace comma with decimal point
-  let normalized = priceStr.replace(/\./g, '').replace(',', '.').replace('$', '').trim();
-  let price = parseFloat(normalized);
-
-  // Check if the decimals are .00
-  if (price % 1 === 0) {
-    return price.toFixed(0);
-  } else {
-    return price.toFixed(2);
-  }
-}
-
 const getYesterdayDate = (timezoneOffset) => {
   const date = new Date();
   date.setDate(date.getDate() - 1);
@@ -19,15 +6,27 @@ const getYesterdayDate = (timezoneOffset) => {
   return date;
 };
 
-function calculatePercentageChange(currentPrice, previousPrice) {
-  if (previousPrice === 0) return 0;
-  return ((currentPrice - previousPrice) / previousPrice) * 100;
-}
+const getTodayDate = (timezoneOffset) => {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setMinutes(date.getMinutes() + timezoneOffset * 60);
+  return date;
+};
 
-function getCurrentHour(timezoneOffset) {
-  const now = new Date();
-  now.setHours(now.getHours() + timezoneOffset);
-  return now.getHours();
-}
+const getCurrentHour = (timezoneOffset) => {
+  const date = new Date();
+  date.setMinutes(date.getMinutes() + timezoneOffset * 60);
+  return date.getHours();
+};
 
-module.exports = { formatPrice, getYesterdayDate, calculatePercentageChange, getCurrentHour };
+const formatPrice = (priceText) => {
+  // Remove currency symbol and thousand separators, replace comma with dot
+  return priceText.replace(/[^\d,]/g, '').replace(',', '.');
+};
+
+module.exports = {
+  getYesterdayDate,
+  getTodayDate,
+  getCurrentHour,
+  formatPrice
+};

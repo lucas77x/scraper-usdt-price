@@ -14,103 +14,76 @@ class Scraper {
   }
 
   async run() {
+    console.log('Iniciando el scraper...');
     const browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
 
     try {
-      // Navigate to the target URL
+      console.log('Navegando a la URL:', this.url);
       await page.goto(this.url, { waitUntil: 'networkidle' });
 
-      // Click on the "USDT" button
+      console.log('Haciendo clic en el botón USDT');
       await page.click('button:has-text("USDT")');
 
-      // Wait for the "Mejor para vender" section to appear
+      console.log('Esperando a que aparezca el selector "Mejor para vender"');
       await page.waitForSelector('h3:has-text("Mejor para vender")');
 
-      // Retrieve the price and vendor information
+      console.log('Obteniendo precio y vendedor');
       const { priceText, vendorText } = await this.getPriceAndVendor(page);
+      console.log('Precio obtenido:', priceText);
+      console.log('Vendedor obtenido:', vendorText);
 
-      // Format the price
       const formattedPrice = parseFloat(formatPrice(priceText));
+      console.log('Precio formateado:', formattedPrice);
 
-      // Evaluate notification rules
       const { shouldNotify, messageType } = await this.ruleEvaluator.shouldNotify(formattedPrice);
+      console.log('Resultado de shouldNotify:', shouldNotify, messageType);
 
       if (shouldNotify) {
-        let message;
+        const message = `Nuevo precio: ${formattedPrice} en ${vendorText}.`;
 
-        if (messageType === 'hourly') {
-          // Message for hourly notification
-          message = `Precio de compra: $${formattedPrice} en ${vendorText}.`;
-        } else {
-          // Default message for other notifications
-          message = `Nuevo precio: ${formattedPrice} en ${vendorText}.`;
-        }
-
-        // Send notification via Telegram
         try {
+          console.log('Enviando notificación');
           await this.notifier.sendMessage(message);
           console.log('Notificación enviada por Telegram.');
         } catch (error) {
           console.error('Error al enviar la notificación:', error);
         }
+
+        // Insertar el nuevo precio en la base de datos
+        console.log('Insertando nuevo precio en la base de datos');
+        try {
+          const lastID = await db.insertPrice(formattedPrice, vendorText);
+          console.log(`Nuevo precio guardado con ID ${lastID}: ${formattedPrice} en ${vendorText}.`);
+        } catch (error) {
+          console.error('Error al guardar el precio en la base de datos:', error);
+        }
       } else {
         console.log('No se envió notificación; no se cumplieron las condiciones.');
-      }
-
-      // Insert the new price into the database only if it has changed
-      const lastPrice = await this.getLastPrice();
-
-      if (formattedPrice !== lastPrice) {
-        db.insertPrice(formattedPrice, vendorText);
-        console.log(`Nuevo precio guardado: ${formattedPrice} en ${vendorText}.`);
-      } else {
-        console.log('El precio no cambió. No se guardó en la base de datos.');
       }
     } catch (error) {
       console.error('Error durante el scraping:', error);
     } finally {
       await browser.close();
+      console.log('Navegador cerrado.');
     }
   }
 
   async getPriceAndVendor(page) {
-    // Select the <h3> element containing "Mejor para vender"
-    const mejorParaVenderH3 = await page.$('h3:has-text("Mejor para vender")');
-
-    // Verify that the element exists
-    if (!mejorParaVenderH3) {
-      throw new Error('No se encontró la sección "Mejor para vender".');
+    try {
+      const priceText = await page.textContent('div:has(h3:has-text("Mejor para vender")) .text-2xl.font-bold');
+      const vendorText = await page.textContent('div:has(h3:has-text("Mejor para vender")) p.text-xs');
+      return { priceText, vendorText };
+    } catch (error) {
+      console.error('Error al obtener el precio y el vendedor:', error);
+      throw error;
     }
-
-    // Get the closest parent div with the class 'rounded-lg'
-    const parentDiv = await mejorParaVenderH3.evaluateHandle(el => el.closest('div.rounded-lg'));
-
-    // Get the price element
-    const priceElement = await parentDiv.$('div.text-2xl.font-bold');
-    const priceText = await priceElement.innerText();
-
-    // Get the vendor text below the price
-    const vendorElement = await parentDiv.$('p.text-xs');
-    const vendorText = await vendorElement.innerText();
-
-    return { priceText, vendorText };
-  }
-
-  getLastPrice() {
-    return new Promise((resolve, reject) => {
-      db.getLastPrice((err, price) => {
-        if (err) reject(err);
-        else resolve(price !== null ? parseFloat(price) : null);
-      });
-    });
   }
 }
 
-// Instantiate Notifier and RuleEvaluator
-const notifier = new Notifier(process.env.BOT_TOKEN, process.env.CHAT_ID);
-const ruleEvaluator = new RuleEvaluator();
-
-// Instantiate and run Scraper
-const scraper = new Scraper(notifier, ruleEvaluator);
-scraper.run();
+(async () => {
+  const notifier = new Notifier(process.env.BOT_TOKEN, process.env.CHAT_ID);
+  const ruleEvaluator = new RuleEvaluator();
+  const scraper = new Scraper(notifier, ruleEvaluator);
+  await scraper.run();
+})();
