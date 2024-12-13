@@ -22,22 +22,18 @@ class Scraper {
       console.log('Navegando a la URL:', this.url);
       await page.goto(this.url, { waitUntil: 'networkidle' });
 
-      console.log('Haciendo clic en el botón USDT');
       await page.click('button:has-text("USDT")');
 
-      console.log('Esperando a que aparezca el selector "Mejor para vender"');
       await page.waitForSelector('h3:has-text("Mejor para vender")');
 
       console.log('Obteniendo precio y vendedor');
       const { priceText, vendorText } = await this.getPriceAndVendor(page);
       console.log('Precio obtenido:', priceText);
-      console.log('Vendedor obtenido:', vendorText);
+      console.log('Vendedor:', vendorText);
 
       const formattedPrice = parseFloat(formatPrice(priceText));
-      console.log('Precio formateado:', formattedPrice);
 
       const { shouldNotify, messageType } = await this.ruleEvaluator.shouldNotify(formattedPrice);
-      console.log('Resultado de shouldNotify:', shouldNotify, messageType);
 
       if (shouldNotify) {
         const message = `Nuevo precio: ${formattedPrice} en ${vendorText}.`;
@@ -50,8 +46,6 @@ class Scraper {
           console.error('Error al enviar la notificación:', error);
         }
 
-        // Insertar el nuevo precio en la base de datos
-        console.log('Insertando nuevo precio en la base de datos');
         try {
           const lastID = await db.insertPrice(formattedPrice, vendorText);
           console.log(`Nuevo precio guardado con ID ${lastID}: ${formattedPrice} en ${vendorText}.`);
@@ -65,7 +59,6 @@ class Scraper {
       console.error('Error durante el scraping:', error);
     } finally {
       await browser.close();
-      console.log('Navegador cerrado.');
     }
   }
 
